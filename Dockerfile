@@ -1,11 +1,10 @@
 FROM java:8
 
-ARG DEBIAN_FRONTEND=noninteractive
-ENV HBASE_VERSION 1.4.9
-ENV HBASE_INSTALL_DIR /opt/hbase
+RUN dpkg-reconfigure -f noninteractive tzdata
 
-RUN mkdir -p ${HBASE_INSTALL_DIR} && \
-    curl -L https://mirrors.tuna.tsinghua.edu.cn/apache/hbase/${HBASE_VERSION}/hbase-${HBASE_VERSION}-bin.tar.gz | tar -xz --strip=1 -C ${HBASE_INSTALL_DIR}
+ENV HADOOP_VERSION 2.7.6
+ENV HADOOP_URL https://mirrors.tuna.tsinghua.edu.cn/apache/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz
+ENV HADOOP_INSTALL_DIR /opt/hadoop
 
 # Use aliyun source
 RUN echo "deb http://mirrors.aliyun.com/debian/ jessie main non-free contrib" > /etc/apt/sources.list
@@ -14,10 +13,13 @@ RUN echo "deb-src http://mirrors.aliyun.com/debian/ jessie main non-free contrib
 RUN echo "deb-src http://mirrors.aliyun.com/debian/ jessie-proposed-updates main non-free contrib" >> /etc/apt/sources.list
 
 RUN  apt-get update && \
-     apt-get install -y --no-install-recommends git curl && \
+     apt-get install -y --no-install-recommends git curl tar ssh dnsutils net-tools && \
      apt-get clean autoclean && \
      apt-get autoremove --yes && \
      rm -rf /var/lib/apt/lists/*
+
+RUN  mkdir -p ${HADOOP_INSTALL_DIR} && \
+     curl -sSL ${HADOOP_URL} | tar -xz --strip-components 1 -C ${HADOOP_INSTALL_DIR}
 
 # build LZO
 WORKDIR /tmp
@@ -37,8 +39,7 @@ RUN apt-get update && \
     rm -rf /var/lib/{apt,dpkg,cache.log}/ && \
     cd target/native/Linux-amd64-64 && \
     tar -cBf - -C lib . | tar -xBvf - -C /tmp && \
-    mkdir -p ${HBASE_INSTALL_DIR}/lib/native && \
-    cp /tmp/libgplcompression* ${HBASE_INSTALL_DIR}/lib/native/ && \
-    cd /tmp/hadoop-lzo && cp target/hadoop-lzo-0.4.20.jar ${HBASE_INSTALL_DIR}/lib/ && \
-    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lzo-2.09/lib" >> ${HBASE_INSTALL_DIR}/conf/hbase-env.sh && \
+    cp /tmp/libgplcompression* ${HADOOP_INSTALL_DIR}/lib/native/ && \
+    cd /tmp/hadoop-lzo && cp target/hadoop-lzo-0.4.20.jar ${HADOOP_INSTALL_DIR}/share/hadoop/common/ && \
+    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lzo-2.09/lib" >> ${HADOOP_INSTALL_DIR}/etc/hadoop/hadoop-env.sh && \
     rm -rf /tmp/lzo-2.09* hadoop-lzo lib libgplcompression*
